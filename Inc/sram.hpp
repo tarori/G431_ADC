@@ -32,6 +32,7 @@ public:
         send_dummy_4byte();
         cs_high();
         delay_command();
+        MODIFY_REG(hspi->Instance->CR1, SPI_CR1_BR, SPI_BAUDRATEPRESCALER_8);
         cs_low();
     }
 
@@ -52,6 +53,7 @@ public:
     {
         send_dummy_4byte();
         cs_high();
+        MODIFY_REG(hspi->Instance->CR1, SPI_CR1_BR, SPI_BAUDRATEPRESCALER_16);
     }
 
     void end_read()
@@ -74,7 +76,7 @@ public:
 
     void sram_test()
     {
-        constexpr int sram_test_size = 8;
+        constexpr int sram_test_size = 65535;
         this->start_write();
         for (int i = 0; i < sram_test_size; ++i) {
             while (!READ_BIT(hspi->Instance->SR, SPI_FLAG_TXE)) {
@@ -83,7 +85,7 @@ public:
         }
         this->end_write();
 
-        delay_command();
+        delay_ms(100);
 
         this->start_read();
         for (int i = 0; i < sram_test_size; ++i) {
@@ -92,8 +94,10 @@ public:
             hspi->Instance->DR = 0;
             while (!READ_BIT(hspi->Instance->SR, SPI_FLAG_RXNE)) {
             }
-            uint8_t data = hspi->Instance->DR;
-            printf("%d\n", data);
+            uint16_t data = hspi->Instance->DR;
+            if (i % 10000 == 0) {
+                printf("%d\n", data);
+            }
         }
         this->end_read();
     }
@@ -110,7 +114,7 @@ private:
 
     void delay_command()
     {
-        delay_ms(1);
+        delay_ms(10);
     }
 
     // for ESP32 SPI DMA errata
