@@ -8,11 +8,11 @@
 #include "utils.hpp"
 #include "sram.hpp"
 
-constexpr bool print_stat = true;
+constexpr bool print_stat = false;
 constexpr bool is_external = true;
 
 constexpr uint32_t data_buf_internal_len = 8192;
-constexpr uint32_t data_buf_external_len = 8192;
+constexpr uint32_t data_buf_external_len = 262144;
 constexpr uint32_t adc_dma_buf_len = 256;
 uint16_t data_buf_internal[data_buf_internal_len];
 uint16_t adc_dma_buf[adc_dma_buf_len];
@@ -43,6 +43,8 @@ void main_loop()
     HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)dac_dma_buf, dac_dma_buf_len, DAC_ALIGN_12B_R);
     MODIFY_REG(hdac1.DMA_Handle1->Instance->CCR, DMA_IT_TC | DMA_IT_HT | DMA_IT_TE, 0);
 
+    sram.init();
+
     delay_ms(1000);  // wait external ADC calibration > 500ms
 
     HAL_TIM_Base_Start(&htim2);  // to measure elapsed time
@@ -50,7 +52,7 @@ void main_loop()
     HAL_TIM_Base_Start(&htim3);  // CNVST of ADC
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
 
-    sram.init();
+    delay_ms(5000);
 
     while (1) {
         if (is_external) {
@@ -62,11 +64,20 @@ void main_loop()
             uint32_t clock_elapsed = TIM2->CNT - start_clock;
 
             if (!print_stat) {
+                delay_ms(100);
+                sram.start_read();
                 for (uint32_t i = 0; i < data_buf_external_len; ++i) {
-                    uint16_t value = ~data_buf_internal[i] & ((1 << 14) - 1);
+                    while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_TXE)) {
+                    }
+                    hspi3.Instance->DR = 0;
+                    while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_RXNE)) {
+                    }
+                    uint16_t data = hspi3.Instance->DR;
+                    uint16_t value = ~data & ((1 << 14) - 1);
                     float voltage = 5.0f / 16383 * value;
                     printf("%.5f V\n", voltage);
                 }
+                sram.end_read();
             } else {
                 float clock_per_sample = 1.0f * clock_elapsed / data_buf_internal_len;
                 float us_elapsed = clock_elapsed * 1.0e+6f / SystemCoreClock;
@@ -94,7 +105,7 @@ void main_loop()
                 printf("%.2fus, %.3fMS/s, %.3fCLK\n", us_elapsed, sample_rate_mega, clock_per_sample);
             }
         }
-        delay_ms(5000);
+        delay_ms(50000);
     }
 }
 
@@ -122,7 +133,7 @@ static inline bool get_CNVST()
 
 #define GET_CNVST() (TIM3->CNT < 70)
 
-__attribute__((long_call, section(".ccmram"))) void adc_measure_external()
+__attribute__((long_call, section(".ccmram"))) void adc_measure_external_test()
 {
     SPI_TypeDef* spi_adc = hspi1.Instance;
 
@@ -153,7 +164,7 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_external()
     }
 }
 
-__attribute__((long_call, section(".ccmram"))) void adc_measure_external_test()
+__attribute__((long_call, section(".ccmram"))) void adc_measure_external()
 {
     SPI_TypeDef* spi_adc = hspi1.Instance;
     SPI_TypeDef* spi_sram = hspi3.Instance;
@@ -170,19 +181,21 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_external_test()
     while (get_CNVST() == false) {
     }
     uint32_t data_count = 0;
-    while (data_count < data_buf_external_len) {
+    while (data_count < data_buf_external_len + 8) {
         // Converting phase
         while (get_CNVST() == true) {
         }
 
         // Input Acquisition
         spi_adc->DR = 0;
-        while (get_CNVST() == false) {
+        while (READ_BIT(spi_adc->SR, SPI_FLAG_RXNE) == false) {
         }
         uint16_t value = spi_adc->DR;
         spi_sram->DR = value;
         ++data_count;
     }
+
+    sram.end_write();
 }
 
 void adc_calibration_external()
@@ -215,6 +228,8 @@ void setup_dac()
 extern "C" {
 extern DMA_HandleTypeDef hdma_adc1;
 extern DMA_HandleTypeDef hdma_dac1_ch1;
+extern PCD_HandleTypeDef hpcd_USB_FS;
+
 /**
  * @brief This function handles System tick timer.
  */
@@ -252,5 +267,18 @@ void DMA1_Channel2_IRQHandler(void)
 {
     printf("DMA1_Channel2_IRQHandler\n");
     HAL_DMA_IRQHandler(&hdma_dac1_ch1);
+}
+
+/**
+ * @brief This function handles USB low priority interrupt remap.
+ */
+void USB_LP_IRQHandler(void)
+{
+    HAL_PCD_IRQHandler(&hpcd_USB_FS);
+}
+
+// For C-linkage
+void SystemClock_Config(void)
+{
 }
 }

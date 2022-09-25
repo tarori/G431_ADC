@@ -51,9 +51,9 @@ else()
 endif()
 
 
-include_directories("Inc" "${CubeMX_dir}/Inc" "${CubeMX_dir}/Drivers/CMSIS/Device/ST/STM32G4xx/Include" "${CubeMX_dir}/Drivers/CMSIS/Include" "${CubeMX_dir}/Drivers/STM32G4xx_HAL_Driver/Inc" "${CubeMX_dir}/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy")
+include_directories("Inc" "${CubeMX_dir}/Inc" "${CubeMX_dir}/Drivers/CMSIS/Device/ST/STM32G4xx/Include" "${CubeMX_dir}/Drivers/CMSIS/Include" "${CubeMX_dir}/Drivers/STM32G4xx_HAL_Driver/Inc" "${CubeMX_dir}/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy" "${CubeMX_dir}/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc" "${CubeMX_dir}/Middlewares/ST/STM32_USB_Device_Library/Core/Inc")
 
-file(GLOB PERIPH_LIB_SOURCE "${CubeMX_dir}/Src/*.c" "${CubeMX_dir}/Drivers/STM32G4xx_HAL_Driver/Src/*.c" "${CubeMX_dir}/*.s")
+file(GLOB PERIPH_LIB_SOURCE "${CubeMX_dir}/Src/*.c" "${CubeMX_dir}/Drivers/STM32G4xx_HAL_Driver/Src/*.c" "${CubeMX_dir}/*.s" "${CubeMX_dir}/Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/*.c" "${CubeMX_dir}/Middlewares/ST/STM32_USB_Device_Library/Core/Src/*.c")
 list(REMOVE_ITEM PERIPH_LIB_SOURCE "${CubeMX_dir}/Src/main.c")
 list(REMOVE_ITEM PERIPH_LIB_SOURCE "${CubeMX_dir}/Src/stm32g4xx_it.c")
 

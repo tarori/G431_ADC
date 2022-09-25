@@ -32,7 +32,7 @@ public:
         send_dummy_4byte();
         cs_high();
         delay_command();
-        MODIFY_REG(hspi->Instance->CR1, SPI_CR1_BR, SPI_BAUDRATEPRESCALER_8);
+        MODIFY_REG(hspi->Instance->CR1, SPI_CR1_BR, SPI_BAUDRATEPRESCALER_4);
         cs_low();
     }
 
@@ -114,7 +114,7 @@ private:
 
     void delay_command()
     {
-        delay_ms(10);
+        delay_ms(20);
     }
 
     // for ESP32 SPI DMA errata
