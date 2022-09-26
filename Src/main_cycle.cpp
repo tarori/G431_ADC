@@ -12,7 +12,7 @@ constexpr bool print_stat = false;
 constexpr bool is_external = true;
 
 constexpr uint32_t data_buf_internal_len = 8192;
-constexpr uint32_t data_buf_external_len = 262144;
+constexpr uint32_t data_buf_external_len = 65536;
 constexpr uint32_t adc_dma_buf_len = 256;
 uint16_t data_buf_internal[data_buf_internal_len];
 uint16_t adc_dma_buf[adc_dma_buf_len];
@@ -73,8 +73,8 @@ void main_loop()
                     while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_RXNE)) {
                     }
                     uint16_t data = hspi3.Instance->DR;
-                    uint16_t value = ~data & ((1 << 14) - 1);
-                    float voltage = 5.0f / 16383 * value;
+                    int16_t value = ~data;
+                    float voltage = 5.0f / 65535 * value;
                     printf("%.5f V\n", voltage);
                 }
                 sram.end_read();
@@ -181,7 +181,7 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_external()
     while (get_CNVST() == false) {
     }
     uint32_t data_count = 0;
-    while (data_count < data_buf_external_len + 8) {
+    while (data_count < data_buf_external_len) {
         // Converting phase
         while (get_CNVST() == true) {
         }
