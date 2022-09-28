@@ -105,7 +105,12 @@ void main_loop()
                 printf("%.2fus, %.3fMS/s, %.3fCLK\n", us_elapsed, sample_rate_mega, clock_per_sample);
             }
         }
-        delay_ms(50000);
+
+        if (print_stat) {
+            delay_ms(100);
+        } else {
+            delay_ms(50000);
+        }
     }
 }
 
@@ -128,40 +133,7 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_internal()
 
 static inline bool get_CNVST()
 {
-    return TIM3->CNT < 75;
-}
-
-#define GET_CNVST() (TIM3->CNT < 70)
-
-__attribute__((long_call, section(".ccmram"))) void adc_measure_external_test()
-{
-    SPI_TypeDef* spi_adc = hspi1.Instance;
-
-    __HAL_SPI_ENABLE(&hspi1);
-
-    while (READ_BIT(spi_adc->SR, SPI_FLAG_RXNE) == true) {
-        [[maybe_unused]] uint16_t dummy = spi_adc->DR;
-    }
-
-    while (get_CNVST() == true) {
-    }
-    while (get_CNVST() == false) {
-    }
-    uint32_t data_count = 0;
-    while (data_count < data_buf_internal_len) {
-        // Converting phase
-        while (get_CNVST() == true) {
-        }
-
-        // Input Acquisition
-        spi_adc->DR = 0;
-
-        while (READ_BIT(spi_adc->SR, SPI_FLAG_RXNE) == false) {
-        }
-        uint16_t value = spi_adc->DR;
-        data_buf_internal[data_count] = value;
-        ++data_count;
-    }
+    return TIM3->CNT < 300;
 }
 
 __attribute__((long_call, section(".ccmram"))) void adc_measure_external()
@@ -193,9 +165,43 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_external()
         uint16_t value = spi_adc->DR;
         spi_sram->DR = value;
         ++data_count;
+
+        while (get_CNVST() == false) {
+        }
     }
 
     sram.end_write();
+}
+
+__attribute__((long_call, section(".ccmram"))) void adc_measure_external_test()
+{
+    SPI_TypeDef* spi_adc = hspi1.Instance;
+
+    __HAL_SPI_ENABLE(&hspi1);
+
+    while (READ_BIT(spi_adc->SR, SPI_FLAG_RXNE) == true) {
+        [[maybe_unused]] uint16_t dummy = spi_adc->DR;
+    }
+
+    while (get_CNVST() == true) {
+    }
+    while (get_CNVST() == false) {
+    }
+    uint32_t data_count = 0;
+    while (data_count < data_buf_internal_len) {
+        // Converting phase
+        while (get_CNVST() == true) {
+        }
+
+        // Input Acquisition
+        spi_adc->DR = 0;
+
+        while (READ_BIT(spi_adc->SR, SPI_FLAG_RXNE) == false) {
+        }
+        uint16_t value = spi_adc->DR;
+        data_buf_internal[data_count] = value;
+        ++data_count;
+    }
 }
 
 void adc_calibration_external()

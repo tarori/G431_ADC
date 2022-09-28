@@ -6,8 +6,8 @@ import numpy as np
 from scipy import signal
 import sys
 
-#Fs = 1e+6
-Fs = 8e+6
+Fs = 2e+5
+#Fs = 8e+6
 dt = 1 / Fs
 
 if len(sys.argv) == 1:
