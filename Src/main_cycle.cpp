@@ -133,7 +133,7 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_internal()
 
 static inline bool get_CNVST()
 {
-    return TIM3->CNT < 300;
+    return TIM3->CNT < 60;
 }
 
 __attribute__((long_call, section(".ccmram"))) void adc_measure_external()
