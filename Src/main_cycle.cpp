@@ -12,7 +12,7 @@ constexpr bool print_stat = false;
 constexpr bool is_external = true;
 
 constexpr uint32_t data_buf_internal_len = 8192;
-constexpr uint32_t data_buf_external_len = 65536;
+constexpr uint32_t data_buf_external_len = 4 * 65536;
 constexpr uint32_t adc_dma_buf_len = 256;
 uint16_t data_buf_internal[data_buf_internal_len];
 uint16_t adc_dma_buf[adc_dma_buf_len];
@@ -74,7 +74,7 @@ void main_loop()
                     }
                     uint16_t data = hspi3.Instance->DR;
                     int16_t value = ~data;
-                    float voltage = 5.0f / 65535 * value;
+                    float voltage = 5.0f / 32768 * value;
                     printf("%.5f V\n", voltage);
                 }
                 sram.end_read();
@@ -143,11 +143,6 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_external()
 
     sram.start_write();
 
-    __HAL_SPI_ENABLE(&hspi1);
-    while (READ_BIT(spi_adc->SR, SPI_FLAG_RXNE) == true) {
-        [[maybe_unused]] uint16_t dummy = spi_adc->DR;
-    }
-
     while (get_CNVST() == true) {
     }
     while (get_CNVST() == false) {
@@ -159,7 +154,8 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_external()
         }
 
         // Input Acquisition
-        spi_adc->DR = 0;
+        SET_BIT(spi_adc->CR1, SPI_CR1_SPE);
+        CLEAR_BIT(spi_adc->CR1, SPI_CR1_SPE);
         while (READ_BIT(spi_adc->SR, SPI_FLAG_RXNE) == false) {
         }
         uint16_t value = spi_adc->DR;
