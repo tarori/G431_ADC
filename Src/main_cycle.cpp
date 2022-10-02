@@ -12,7 +12,7 @@ constexpr bool print_stat = false;
 constexpr bool is_external = true;
 
 constexpr uint32_t data_buf_internal_len = 8192;
-constexpr uint32_t data_buf_external_len = 4 * 65536;
+constexpr uint32_t data_buf_external_len = 65536;
 constexpr uint32_t adc_dma_buf_len = 256;
 uint16_t data_buf_internal[data_buf_internal_len];
 uint16_t adc_dma_buf[adc_dma_buf_len];
@@ -29,6 +29,7 @@ void setup_dac();
 
 void main_loop()
 {
+    delay_ms(1000);  // wait USB  connection
     setbuf(stdout, NULL);
     setbuf(stdin, NULL);
     printf("Hello, I am working at %ld MHz\n", SystemCoreClock / 1000 / 1000);
@@ -52,9 +53,11 @@ void main_loop()
     HAL_TIM_Base_Start(&htim3);  // CNVST of ADC
     HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
 
-    delay_ms(5000);
-
+    printf("ADC is ready\n");
     while (1) {
+        while (getc(stdin) != 's') {
+        }
+
         if (is_external) {
             uint32_t start_clock = TIM2->CNT;
             {
@@ -106,11 +109,7 @@ void main_loop()
             }
         }
 
-        if (print_stat) {
-            delay_ms(100);
-        } else {
-            delay_ms(50000);
-        }
+        delay_ms(100);
     }
 }
 
