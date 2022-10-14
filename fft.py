@@ -7,6 +7,7 @@ from scipy import signal
 import sys
 
 Fs = 1e+6
+#Fs = 1e+6 / 32
 #Fs = 8e+6
 dt = 1 / Fs
 
@@ -44,7 +45,7 @@ dB = 20 * np.log10(Amp)
 freq_kHz = freq * 1.0e-3
 Fs_kHz = Fs * 1.0e-3
 
-floor = -80 # dB
+floor = -84 # dB
 noise = dB[dB < floor]
 noise_power = (10 ** (noise/10))
 print('noise:',np.sqrt(sum(noise_power)))

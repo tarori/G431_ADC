@@ -12,7 +12,7 @@ constexpr bool print_stat = false;
 constexpr bool is_external = true;
 
 constexpr uint32_t data_buf_internal_len = 8192;
-constexpr uint32_t data_buf_external_len = 65536;
+constexpr uint32_t data_buf_external_len = 4 * 65536;
 constexpr uint32_t adc_dma_buf_len = 256;
 uint16_t data_buf_internal[data_buf_internal_len];
 uint16_t adc_dma_buf[adc_dma_buf_len];
@@ -32,6 +32,7 @@ void main_loop()
     delay_ms(1000);  // wait USB  connection
     setbuf(stdout, NULL);
     setbuf(stdin, NULL);
+    putc('\r', stdout);  // flush
     printf("Hello, I am working at %ld MHz\n", SystemCoreClock / 1000 / 1000);
 
     HAL_ADCEx_Calibration_Start(&hadc1, ADC_DIFFERENTIAL_ENDED);
@@ -76,8 +77,8 @@ void main_loop()
                     while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_RXNE)) {
                     }
                     uint16_t data = hspi3.Instance->DR;
-                    int16_t value = ~data;
-                    float voltage = 5.0f / 32768 * value;
+                    int16_t value = data;
+                    float voltage = 5.0f / 65536 * value;
                     printf("%.5f V\n", voltage);
                 }
                 sram.end_read();
@@ -147,6 +148,7 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_external()
     while (get_CNVST() == false) {
     }
     uint32_t data_count = 0;
+    uint32_t decim_count = 0;
     while (data_count < data_buf_external_len) {
         // Converting phase
         while (get_CNVST() == true) {
@@ -157,9 +159,29 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_external()
         CLEAR_BIT(spi_adc->CR1, SPI_CR1_SPE);
         while (READ_BIT(spi_adc->SR, SPI_FLAG_RXNE) == false) {
         }
-        uint16_t value = spi_adc->DR;
-        spi_sram->DR = value;
-        ++data_count;
+        uint16_t value = ~(spi_adc->DR);
+
+        if (true) {  // No average
+            spi_sram->DR = value;
+            ++data_count;
+
+        } else {
+            static int32_t int1 = 0, int2 = 0, int3 = 0;
+            int1 += static_cast<int16_t>(value);
+            int2 += int1;
+            int3 += int2;
+            if (++decim_count % 32 == 0) {
+                static int32_t int3_prev = 0, diff1_prev = 0, diff2_prev;
+                int32_t diff1 = int3 - int3_prev;
+                int3_prev = int3;
+                int32_t diff2 = diff1 - diff1_prev;
+                diff1_prev = diff1;
+                int32_t diff3 = diff2 - diff2_prev;
+                diff2_prev = diff2;
+                spi_sram->DR = static_cast<uint16_t>(diff3 / 32 / 32 / 32);
+                data_count++;
+            }
+        }
 
         while (get_CNVST() == false) {
         }
