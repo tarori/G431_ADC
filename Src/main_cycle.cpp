@@ -77,6 +77,9 @@ void main_loop()
                     while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_RXNE)) {
                     }
                     int16_t code = hspi3.Instance->DR;
+                    if (code >= 0) {
+                        code -= 1;
+                    }
                     printf("%d\n", code);
                 }
                 sram.end_read();
@@ -131,7 +134,7 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_internal()
 
 static inline bool get_CNVST()
 {
-    return TIM3->CNT < 60;
+    return TIM3->CNT < 120;
 }
 
 __attribute__((long_call, section(".ccmram"))) void adc_measure_external()
@@ -222,18 +225,21 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_external_test()
 void adc_calibration_external()
 {
     SPI_TypeDef* spi_adc = hspi1.Instance;
-    __HAL_SPI_ENABLE(&hspi1);
-    __HAL_TIM_MOE_DISABLE_UNCONDITIONALLY(&htim3);
-    for (int i = 0; i < 1024 / 14 + 1; ++i) {
-        while (READ_BIT(spi_adc->SR, SPI_FLAG_TXE) == false) {
-        }
-        spi_adc->DR = 0;
+    uint32_t prev_width = __HAL_TIM_GET_COMPARE(&htim3, TIM_CHANNEL_3);
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0);  // CS Low
+    delay_ms(1);
+
+    // send 1024 clocks
+    for (int i = 0; i < 1024 / 16; ++i) {
+        SET_BIT(spi_adc->CR1, SPI_CR1_SPE);
+        CLEAR_BIT(spi_adc->CR1, SPI_CR1_SPE);
         while (READ_BIT(spi_adc->SR, SPI_FLAG_RXNE) == false) {
         }
         [[maybe_unused]] uint16_t value = spi_adc->DR;
     }
+
     delay_ms(1000);
-    __HAL_TIM_MOE_ENABLE(&htim3);
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, prev_width);  // restore normal operation
 }
 
 void setup_dac()
