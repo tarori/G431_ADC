@@ -76,10 +76,8 @@ void main_loop()
                     hspi3.Instance->DR = 0;
                     while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_RXNE)) {
                     }
-                    uint16_t data = hspi3.Instance->DR;
-                    int16_t value = data;
-                    float voltage = 5.0f / 65536 * value;
-                    printf("%.5f V\n", voltage);
+                    int16_t code = hspi3.Instance->DR;
+                    printf("%d\n", code);
                 }
                 sram.end_read();
             } else {
@@ -99,8 +97,8 @@ void main_loop()
 
             if (!print_stat) {
                 for (uint32_t i = 0; i < data_buf_internal_len; ++i) {
-                    float voltage = 3.3f / 2047 * (data_buf_internal[i] - 2048);
-                    printf("%.5f V\n", voltage);
+                    int16_t code = data_buf_internal[i] - 2048;
+                    printf("%d\n", code);
                 }
             } else {
                 float clock_per_sample = 1.0f * clock_elapsed / data_buf_internal_len;
