@@ -8,9 +8,8 @@ import sys
 
 Fs = 1e+6
 #Fs = 1e+6 / 32
-#Fs = 8e+6
 dt = 1 / Fs
-Vref = 5.0
+Vref = 2.0
 
 if len(sys.argv) == 1:
     print("ファイルを指定してにょ")
@@ -18,7 +17,7 @@ if len(sys.argv) == 1:
 
 df = pd.read_csv(sys.argv[1], names=['value'])
 #df = df['value'].str.strip("V")
-df = df['value'] * Vref / 65536
+df = df['value'] * Vref / 16384
 df = df.astype(float)
 
 N = len(df)

@@ -27,11 +27,6 @@ static inline void delay_ms(uint32_t ms)
     delay_us(1000 * ms);
 }
 
-static inline uint32_t dma_get_last_index(ADC_HandleTypeDef* hadc, uint32_t buf_size)
-{
-    return (2 * buf_size - 1 - hadc->DMA_Handle->Instance->CNDTR) % buf_size;
-}
-
 static inline bool HAL_Check(HAL_StatusTypeDef ret, const char* s)
 {
     if (ret == HAL_OK) {
