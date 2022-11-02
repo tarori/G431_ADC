@@ -12,7 +12,7 @@ constexpr bool print_stat = false;
 constexpr bool is_external = true;
 
 constexpr uint32_t data_buf_internal_len = 8192;
-constexpr uint32_t data_buf_external_len = 4 * 65536;
+constexpr uint32_t data_buf_external_len = 8 * 65536;
 constexpr uint32_t adc_dma_buf_len = 256;
 uint16_t data_buf_internal[data_buf_internal_len];
 uint16_t adc_dma_buf[adc_dma_buf_len];
@@ -56,7 +56,14 @@ void main_loop()
 
     printf("ADC is ready\n");
     while (1) {
-        while (getc(stdin) != 's') {
+        while (1) {
+            uint8_t c = getc(stdin);
+            if (c == 's') {
+                break;
+            }
+            if (c == 'c') {
+                adc_calibration_external();
+            }
         }
 
         if (is_external) {
@@ -77,9 +84,6 @@ void main_loop()
                     while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_RXNE)) {
                     }
                     int16_t code = hspi3.Instance->DR;
-                    if (code >= 0) {
-                        code -= 1;
-                    }
                     printf("%d\n", code);
                 }
                 sram.end_read();
@@ -134,7 +138,7 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_internal()
 
 static inline bool get_CNVST()
 {
-    return TIM3->CNT < 120;
+    return TIM3->CNT < 60;
 }
 
 __attribute__((long_call, section(".ccmram"))) void adc_measure_external()
@@ -160,7 +164,7 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_external()
         CLEAR_BIT(spi_adc->CR1, SPI_CR1_SPE);
         while (READ_BIT(spi_adc->SR, SPI_FLAG_RXNE) == false) {
         }
-        uint16_t value = ~(spi_adc->DR);
+        uint16_t value = ~(spi_adc->DR) & 0x3FFF;
 
         if (true) {  // No average
             spi_sram->DR = value;
@@ -224,9 +228,10 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_external_test()
 
 void adc_calibration_external()
 {
+    printf("ADC self-calibration started\n");
     SPI_TypeDef* spi_adc = hspi1.Instance;
     uint32_t prev_width = __HAL_TIM_GET_COMPARE(&htim3, TIM_CHANNEL_3);
-    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0);  // CS Low
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 0);  // CS Low
     delay_ms(1);
 
     // send 1024 clocks
@@ -239,7 +244,8 @@ void adc_calibration_external()
     }
 
     delay_ms(1000);
-    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, prev_width);  // restore normal operation
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, prev_width);  // restore normal operation
+    printf("ADC self-calibration ended\n");
 }
 
 void setup_dac()
