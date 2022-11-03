@@ -7,11 +7,11 @@ import bottleneck as bn
 from scipy import signal
 import sys
 
-Fs = 1e+6
-#Fs = 1e+6 / 32
+#Fs = 1e+6
+Fs = 1e+6 / 32
 #Fs = 8e+6
 dt = 1 / Fs
-Vref = 5.0
+Vref = 5
 
 if len(sys.argv) == 1:
     print("ファイルを指定してにょ")
@@ -75,5 +75,5 @@ plt.ylabel('Signal (uV/√Hz)')
 plt.xscale('log')
 plt.yscale('log')
 plt.xlim([Fs/N*8, Fs/2])
-plt.ylim([0.1, 1.0e+4])
+plt.ylim([1, 1.0e+4])
 plt.show()

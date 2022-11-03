@@ -57,6 +57,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define CNVST_IN_Pin GPIO_PIN_7
+#define CNVST_IN_GPIO_Port GPIOA
 #define SRAM_CS_Pin GPIO_PIN_15
 #define SRAM_CS_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */

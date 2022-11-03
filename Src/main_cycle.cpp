@@ -12,7 +12,7 @@ constexpr bool print_stat = false;
 constexpr bool is_external = true;
 
 constexpr uint32_t data_buf_internal_len = 8192;
-constexpr uint32_t data_buf_external_len = 8 * 65536;
+constexpr uint32_t data_buf_external_len = 4 * 65536;
 constexpr uint32_t adc_dma_buf_len = 256;
 uint16_t data_buf_internal[data_buf_internal_len];
 uint16_t adc_dma_buf[adc_dma_buf_len];
@@ -138,7 +138,8 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_internal()
 
 static inline bool get_CNVST()
 {
-    return TIM3->CNT < 60;
+    // return TIM3->CNT < 60;
+    return !(CNVST_IN_GPIO_Port->IDR & CNVST_IN_Pin);
 }
 
 __attribute__((long_call, section(".ccmram"))) void adc_measure_external()
@@ -156,17 +157,20 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_external()
     uint32_t decim_count = 0;
     while (data_count < data_buf_external_len) {
         // Converting phase
+        uint32_t spi_reg_next = READ_REG(spi_adc->CR1);
+        spi_reg_next |= SPI_CR1_SPE;
         while (get_CNVST() == true) {
         }
 
         // Input Acquisition
-        SET_BIT(spi_adc->CR1, SPI_CR1_SPE);
-        CLEAR_BIT(spi_adc->CR1, SPI_CR1_SPE);
+        WRITE_REG(spi_adc->CR1, spi_reg_next);
+        spi_reg_next &= ~SPI_CR1_SPE;
+        WRITE_REG(spi_adc->CR1, spi_reg_next);
         while (READ_BIT(spi_adc->SR, SPI_FLAG_RXNE) == false) {
         }
         uint16_t value = ~(spi_adc->DR) & 0x3FFF;
 
-        if (true) {  // No average
+        if (false) {  // No average
             spi_sram->DR = value;
             ++data_count;
 
@@ -183,8 +187,10 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_external()
                 diff1_prev = diff1;
                 int32_t diff3 = diff2 - diff2_prev;
                 diff2_prev = diff2;
-                spi_sram->DR = static_cast<uint16_t>(diff3 / 32 / 32 / 32);
-                data_count++;
+                if (decim_count > 32 * 10) {
+                    data_count++;
+                    spi_sram->DR = static_cast<uint16_t>(diff3 / 32 / 32 / 32);
+                }
             }
         }
 
