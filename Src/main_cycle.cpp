@@ -12,13 +12,17 @@ constexpr bool print_stat = false;
 constexpr bool is_external = true;
 
 constexpr uint32_t data_buf_internal_len = 8192;
-constexpr uint32_t data_buf_external_len = 4 * 65536;
+constexpr uint32_t data_buf_external_len = 1000000;
 constexpr uint32_t adc_dma_buf_len = 256;
 uint16_t data_buf_internal[data_buf_internal_len];
 uint16_t adc_dma_buf[adc_dma_buf_len];
 
-constexpr uint32_t dac_dma_buf_len = 1000;
+constexpr uint32_t dac_dma_buf_len = 0;
 uint16_t dac_dma_buf[dac_dma_buf_len];
+
+constexpr uint32_t send_buf_len = 0;
+constexpr uint32_t send_buf_margine = 100;
+uint8_t send_buf[send_buf_len + send_buf_margine];
 
 SRAM sram(&hspi3, SRAM_CS_GPIO_Port, SRAM_CS_Pin);
 
@@ -65,6 +69,7 @@ void main_loop()
                 adc_calibration_external();
             }
         }
+        printf("Data acquisition started\n");
 
         if (is_external) {
             uint32_t start_clock = TIM2->CNT;
@@ -76,7 +81,10 @@ void main_loop()
 
             if (!print_stat) {
                 delay_ms(100);
+                printf("Data acquisition ended\n");
                 sram.start_read();
+                uint8_t* send_buf_ptr = send_buf;
+                uint32_t send_buf_data_num = 0;
                 for (uint32_t i = 0; i < data_buf_external_len; ++i) {
                     while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_TXE)) {
                     }
@@ -84,8 +92,19 @@ void main_loop()
                     while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_RXNE)) {
                     }
                     int16_t code = hspi3.Instance->DR;
-                    printf("%d\n", code);
+
+                    uint32_t text_len = sprintf((char*)send_buf_ptr, "%d\n", code);
+                    send_buf_data_num += text_len;
+                    send_buf_ptr += text_len;
+                    if (send_buf_data_num > send_buf_len) {
+                        USB_Transmit_Data(send_buf, send_buf_data_num);
+                        send_buf_ptr = send_buf;
+                        send_buf_data_num = 0;
+                    }
                 }
+                send_buf_ptr[0] = 'E';
+                send_buf_data_num++;
+                USB_Transmit_Data(send_buf, send_buf_data_num);
                 sram.end_read();
             } else {
                 float clock_per_sample = 1.0f * clock_elapsed / data_buf_internal_len;
@@ -93,7 +112,6 @@ void main_loop()
                 float sample_rate_mega = data_buf_internal_len / us_elapsed;
                 printf("%.2fus, %.3fMS/s, %.3fCLK\n", us_elapsed, sample_rate_mega, clock_per_sample);
             }
-
         } else {
             uint32_t start_clock = TIM2->CNT;
             {
@@ -103,9 +121,18 @@ void main_loop()
             uint32_t clock_elapsed = TIM2->CNT - start_clock;
 
             if (!print_stat) {
+                uint8_t* send_buf_ptr = send_buf;
+                uint32_t send_buf_data_num = 0;
                 for (uint32_t i = 0; i < data_buf_internal_len; ++i) {
                     int16_t code = data_buf_internal[i] - 2048;
-                    printf("%d\n", code);
+
+                    send_buf_data_num += sprintf((char*)send_buf_ptr, "%d\n", code);
+                    send_buf_ptr += send_buf_data_num;
+                    if (send_buf_data_num > send_buf_len) {
+                        USB_Transmit_Data(send_buf, send_buf_data_num);
+                        send_buf_ptr = send_buf;
+                        send_buf_data_num = 0;
+                    }
                 }
             } else {
                 float clock_per_sample = 1.0f * clock_elapsed / data_buf_internal_len;

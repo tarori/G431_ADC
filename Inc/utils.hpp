@@ -2,6 +2,8 @@
 #include <stm32g4xx.h>
 #include <stdint.h>
 
+void USB_Transmit_Data(uint8_t* ptr, int len);
+
 #define FIELD_GET(mask, reg) (((reg) & (mask)) >> (__builtin_ffsll(mask) - 1))
 #define __ALIGN_MASK(x, mask) ((x) & ~(mask))
 #define ALIGN(x, a) __ALIGN_MASK(x, (typeof(x))(a)-1)

@@ -34,12 +34,14 @@ plt.show()
 window = signal.hann(N)
 window_factor = 1/(sum(window)/N)
 
-print('df:', df)
-
 df = df - df.mean()
 df = df * window
 
+print('len:', N)
+print('NaN:',df.isna().sum())
+
 F = window_factor * np.fft.fft(df)
+
 freq = np.fft.fftfreq(N, d=dt)
 F = np.abs(F)
 Amp = np.abs(F/(N/2))
@@ -75,5 +77,5 @@ plt.ylabel('Signal (uV/√Hz)')
 plt.xscale('log')
 plt.yscale('log')
 plt.xlim([Fs/N*8, Fs/2])
-plt.ylim([1, 1.0e+4])
+plt.ylim([0.1, 1.0e+4])
 plt.show()
