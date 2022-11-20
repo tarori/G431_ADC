@@ -28,7 +28,7 @@ endif()
 set(CubeMX_dir ${CMAKE_SOURCE_DIR}/CubeMX/G431_ADC)
 
 # set compiler option
-set(COMPILER_OPT_FLAGS "-O2")
+set(COMPILER_OPT_FLAGS "-O3")
 set(COMMON_COMPILER_FLAGS "-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -fdata-sections -ffunction-sections -DUSE_HAL_DRIVER -DSTM32G431xx -Wall -Wextra -Wno-missing-field-initializers ${COMPILER_OPT_FLAGS}")
 set(CMAKE_C_FLAGS "${COMMON_COMPILER_FLAGS} -std=gnu11 -Wno-unused-parameter")
 set(CMAKE_C_FLAGS_DEBUG "-g")

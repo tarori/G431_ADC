@@ -8,9 +8,11 @@
 
 constexpr bool print_stat = false;
 constexpr bool internal_memory = false;
+constexpr bool decim_en = false;
+constexpr uint32_t decim_ratio = 32;
 
 constexpr uint32_t data_buf_internal_len = 8192;
-constexpr uint32_t data_buf_external_len = 8 * 65536;
+constexpr uint32_t data_buf_external_len = 4 * 65536;
 uint16_t data_buf_internal[data_buf_internal_len];
 
 SRAM sram(&hspi3, SRAM_CS_GPIO_Port, SRAM_CS_Pin);
@@ -35,6 +37,7 @@ void main_loop()
 
     delay_ms(1000);  // wait external ADC calibration > 500ms
 
+    HAL_TIM_Base_Start(&htim1);  // for ADC CNVST
     HAL_TIM_Base_Start(&htim2);  // to measure elapsed time
     HAL_TIM_Base_Start(&htim6);  // 1MHz event
 
@@ -76,13 +79,33 @@ void main_loop()
             if (!internal_memory) {
                 sram.start_read();
                 for (uint32_t i = 0; i < data_buf_external_len; ++i) {
-                    while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_TXE)) {
+                    if (!decim_en) {
+                        while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_TXE)) {
+                        }
+                        hspi3.Instance->DR = 0;
+                        while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_RXNE)) {
+                        }
+                        uint16_t value = hspi3.Instance->DR;
+
+                        int16_t code = value;
+                        printf("%d\n", code);
+                    } else {
+                        while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_TXE)) {
+                        }
+                        hspi3.Instance->DR = 0;
+                        while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_RXNE)) {
+                        }
+                        uint32_t value = hspi3.Instance->DR << 16;
+                        while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_TXE)) {
+                        }
+                        hspi3.Instance->DR = 0;
+                        while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_RXNE)) {
+                        }
+                        value |= hspi3.Instance->DR;
+
+                        int32_t code = value;
+                        printf("%ld\n", code);
                     }
-                    hspi3.Instance->DR = 0;
-                    while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_RXNE)) {
-                    }
-                    int16_t code = hspi3.Instance->DR;
-                    printf("%d\n", code);
                 }
                 printf("\r");
                 sram.end_read();
@@ -134,15 +157,17 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure()
 
     uint32_t data_count = 0;
     uint32_t decim_count = 0;
-    while (data_count < data_buf_external_len) {
+    int32_t sum = 0;
+    uint32_t sending_sum = 0;
+    while (data_count < data_buf_external_len + 4) {
 
         // Converting phase
         set_CNVST(true);
         while (get_CNVST() != true) {
         }
-
-        for (uint32_t i = 0; i < 14; ++i) {
-            asm volatile("NOP");
+        TIM1->CNT = 0;
+        uint16_t value = ~(spi_adc->DR);
+        while (TIM1->CNT < 20) {
         }
 
         set_CNVST(false);
@@ -151,35 +176,24 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure()
 
         // Input Acquisition
         spi_adc->DR = 0;
-        /*
-        while (READ_BIT(spi_adc->SR, SPI_FLAG_RXNE) == false) {
-        }
-        */
-        for (uint32_t i = 0; i < 10; ++i) {
-            asm volatile("NOP");
-        }
-        uint16_t value = ~(spi_adc->DR);
 
-        if (true) {  // No average
+        if (!decim_en) {  // No average
             spi_sram->DR = value;
             ++data_count;
 
         } else {
-            static int32_t int1 = 0, int2 = 0, int3 = 0;
-            int1 += static_cast<int16_t>(value);
-            int2 += int1;
-            int3 += int2;
-            if (++decim_count % 32 == 0) {
-                static int32_t int3_prev = 0, diff1_prev = 0, diff2_prev;
-                int32_t diff1 = int3 - int3_prev;
-                int3_prev = int3;
-                int32_t diff2 = diff1 - diff1_prev;
-                diff1_prev = diff1;
-                int32_t diff3 = diff2 - diff2_prev;
-                diff2_prev = diff2;
-                spi_sram->DR = static_cast<uint16_t>(diff3 / 32 / 32 / 32);
+            sum += static_cast<int16_t>(value);
+            if (decim_count % decim_ratio == 0) {
+                sending_sum = sum;
+                sum = 0;
+                spi_sram->DR = sending_sum >> 16;
+            } else if (decim_count % decim_ratio == decim_ratio / 2) {
+                spi_sram->DR = sending_sum;
                 data_count++;
             }
+            ++decim_count;
+        }
+        while (TIM1->CNT < 110) {
         }
     }
 

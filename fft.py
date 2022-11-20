@@ -7,11 +7,11 @@ import bottleneck as bn
 from scipy import signal
 import sys
 
-#Fs = 1e+6
-Fs = 1e+6
+decim_ratio = 32
+Fs = 1e+6 / decim_ratio
 #Fs = 8e+6
 dt = 1 / Fs
-Vref = 5
+Vref = 5 / decim_ratio
 
 if len(sys.argv) == 1:
     print("ファイルを指定してにょ")
@@ -53,7 +53,7 @@ freq_kHz = freq * 1.0e-3
 Fs_kHz = Fs * 1.0e-3
 
 noise_uV = Amp / np.sqrt(freq[1] - freq[0]) / np.sqrt(2) * 1.0e+6
-noise_uV = bn.move_mean(noise_uV, window=32)
+noise_uV = bn.move_mean(noise_uV, window=64)
 
 plt.plot(freq[1:int(N/2)], dB[1:int(N/2)])
 plt.xlabel('f (Hz)')
