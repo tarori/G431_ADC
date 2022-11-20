@@ -11,7 +11,7 @@ constexpr bool internal_memory = false;
 constexpr bool decim_en = false;
 constexpr uint32_t decim_ratio = 32;
 
-constexpr uint32_t data_buf_internal_len = 8192;
+constexpr uint32_t data_buf_internal_len = 4096;
 constexpr uint32_t data_buf_external_len = 4 * 65536;
 uint16_t data_buf_internal[data_buf_internal_len];
 
