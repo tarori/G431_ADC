@@ -57,6 +57,10 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define LED_OK_Pin GPIO_PIN_2
+#define LED_OK_GPIO_Port GPIOA
+#define LED_ERR_Pin GPIO_PIN_3
+#define LED_ERR_GPIO_Port GPIOA
 #define CNVST_IN_Pin GPIO_PIN_4
 #define CNVST_IN_GPIO_Port GPIOA
 #define CNVST_OUT_Pin GPIO_PIN_0

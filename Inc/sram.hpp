@@ -32,7 +32,8 @@ public:
         send_dummy_4byte();
         cs_high();
         delay_command();
-        MODIFY_REG(hspi->Instance->CR1, SPI_CR1_BR, SPI_BAUDRATEPRESCALER_4);
+        MODIFY_REG(hspi->Instance->CR1, SPI_CR1_BR, SPI_BAUDRATEPRESCALER_8);
+        MODIFY_REG(hspi->Instance->CR1, SPI_CR1_CPOL, SPI_POLARITY_HIGH);
         cs_low();
     }
 
@@ -53,7 +54,8 @@ public:
     {
         send_dummy_4byte();
         cs_high();
-        MODIFY_REG(hspi->Instance->CR1, SPI_CR1_BR, SPI_BAUDRATEPRESCALER_16);
+        MODIFY_REG(hspi->Instance->CR1, SPI_CR1_BR, SPI_BAUDRATEPRESCALER_32);
+        MODIFY_REG(hspi->Instance->CR1, SPI_CR1_CPOL, SPI_POLARITY_HIGH);
     }
 
     void end_read()

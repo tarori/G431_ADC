@@ -7,14 +7,19 @@
 #include "sram.hpp"
 
 constexpr bool print_stat = false;
+constexpr bool internal_memory = false;
 
 constexpr uint32_t data_buf_internal_len = 8192;
-constexpr uint32_t data_buf_external_len = 4 * 65536;
+constexpr uint32_t data_buf_external_len = 8 * 65536;
 uint16_t data_buf_internal[data_buf_internal_len];
 
 SRAM sram(&hspi3, SRAM_CS_GPIO_Port, SRAM_CS_Pin);
 
-void adc_measure_external();
+void adc_measure();
+void adc_measure_test();
+uint8_t adc_spi_communicate(bool is_write, uint8_t tx_data);
+
+extern UART_HandleTypeDef huart1;
 
 void main_loop()
 {
@@ -22,6 +27,8 @@ void main_loop()
     setbuf(stdout, NULL);
     setbuf(stdin, NULL);
     putc('\r', stdout);  // flush
+    huart1.Init.BaudRate = 2000000;
+    HAL_UART_Init(&huart1);
     printf("Hello, I am working at %ld MHz\n", SystemCoreClock / 1000 / 1000);
 
     sram.init();
@@ -31,48 +38,77 @@ void main_loop()
     HAL_TIM_Base_Start(&htim2);  // to measure elapsed time
     HAL_TIM_Base_Start(&htim6);  // 1MHz event
 
+    printf("ADC reg: 0x%x\n", adc_spi_communicate(false, 0));
     printf("ADC is ready\n");
+
+    /*
     while (1) {
+        adc_measure();
+    }
+    */
+
+    while (1) {
+        /*
         while (1) {
             uint8_t c = getc(stdin);
             if (c == 's') {
                 break;
             }
         }
+        */
 
         uint32_t start_clock = TIM2->CNT;
         {
             ScopedLock lock;
-            adc_measure_external();
+            HAL_GPIO_WritePin(LED_OK_GPIO_Port, LED_OK_Pin, GPIO_PIN_SET);
+            if (!internal_memory) {
+                adc_measure();
+            } else {
+                adc_measure_test();
+            }
+            HAL_GPIO_WritePin(LED_OK_GPIO_Port, LED_OK_Pin, GPIO_PIN_RESET);
         }
         uint32_t clock_elapsed = TIM2->CNT - start_clock;
 
         if (!print_stat) {
             delay_ms(100);
-            sram.start_read();
-            for (uint32_t i = 0; i < data_buf_external_len; ++i) {
-                while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_TXE)) {
+            HAL_GPIO_WritePin(LED_ERR_GPIO_Port, LED_ERR_Pin, GPIO_PIN_SET);
+            if (!internal_memory) {
+                sram.start_read();
+                for (uint32_t i = 0; i < data_buf_external_len; ++i) {
+                    while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_TXE)) {
+                    }
+                    hspi3.Instance->DR = 0;
+                    while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_RXNE)) {
+                    }
+                    int16_t code = hspi3.Instance->DR;
+                    printf("%d\n", code);
                 }
-                hspi3.Instance->DR = 0;
-                while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_RXNE)) {
+                printf("\r");
+                sram.end_read();
+            } else {
+                for (uint32_t i = 0; i < data_buf_internal_len; ++i) {
+                    int16_t code = data_buf_internal[i];
+                    printf("%d\n", code);
                 }
-                int16_t code = hspi3.Instance->DR;
-                printf("%d\n", code);
+                printf("\r");
             }
-            sram.end_read();
+            HAL_GPIO_WritePin(LED_ERR_GPIO_Port, LED_ERR_Pin, GPIO_PIN_RESET);
         } else {
             float clock_per_sample = 1.0f * clock_elapsed / data_buf_internal_len;
             float us_elapsed = clock_elapsed * 1.0e+6f / SystemCoreClock;
             float sample_rate_mega = data_buf_internal_len / us_elapsed;
             printf("%.2fus, %.3fMS/s, %.3fCLK\n", us_elapsed, sample_rate_mega, clock_per_sample);
         }
+        delay_ms(100);
+
+        delay_ms(10000);
     }
-    delay_ms(100);
 }
 
 static inline bool get_CNVST()
 {
-    return !(CNVST_IN_GPIO_Port->IDR & CNVST_IN_Pin);
+    return (CNVST_IN_GPIO_Port->IDR & CNVST_IN_Pin);
 }
 
 static inline void set_CNVST(bool state)
@@ -84,7 +120,7 @@ static inline void set_CNVST(bool state)
     }
 }
 
-__attribute__((long_call, section(".ccmram"))) void adc_measure_external()
+__attribute__((long_call, section(".ccmram"))) void adc_measure()
 {
     SPI_TypeDef* spi_adc = hspi1.Instance;
     SPI_TypeDef* spi_sram = hspi3.Instance;
@@ -102,15 +138,25 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_external()
 
         // Converting phase
         set_CNVST(true);
-        while (get_CNVST() == true) {
+        while (get_CNVST() != true) {
         }
+
+        for (uint32_t i = 0; i < 14; ++i) {
+            asm volatile("NOP");
+        }
+
         set_CNVST(false);
-        while (get_CNVST() == false) {
+        while (get_CNVST() != false) {
         }
 
         // Input Acquisition
         spi_adc->DR = 0;
+        /*
         while (READ_BIT(spi_adc->SR, SPI_FLAG_RXNE) == false) {
+        }
+        */
+        for (uint32_t i = 0; i < 10; ++i) {
+            asm volatile("NOP");
         }
         uint16_t value = ~(spi_adc->DR);
 
@@ -140,12 +186,12 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_external()
     sram.end_write();
 }
 
-__attribute__((long_call, section(".ccmram"))) void adc_measure_external_test()
+__attribute__((long_call, section(".ccmram"))) void adc_measure_test()
 {
     SPI_TypeDef* spi_adc = hspi1.Instance;
+    set_CNVST(true);
 
-    __HAL_SPI_ENABLE(&hspi1);
-
+    SET_BIT(spi_adc->CR1, SPI_CR1_SPE);
     while (READ_BIT(spi_adc->SR, SPI_FLAG_RXNE) == true) {
         [[maybe_unused]] uint16_t dummy = spi_adc->DR;
     }
@@ -155,10 +201,15 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_external_test()
 
         // Converting phase
         set_CNVST(true);
-        while (get_CNVST() == true) {
+        while (get_CNVST() != true) {
         }
+
+        for (uint32_t i = 0; i < 15; ++i) {
+            asm volatile("NOP");
+        }
+
         set_CNVST(false);
-        while (get_CNVST() == false) {
+        while (get_CNVST() != false) {
         }
 
         // Input Acquisition
@@ -166,9 +217,42 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure_external_test()
         while (READ_BIT(spi_adc->SR, SPI_FLAG_RXNE) == false) {
         }
         uint16_t value = ~(spi_adc->DR);
+
         data_buf_internal[data_count] = value;
         ++data_count;
     }
+}
+
+uint8_t adc_spi_communicate(bool is_write, uint8_t tx_reg)
+{
+    SPI_TypeDef* spi_adc = hspi1.Instance;
+    SET_BIT(spi_adc->CR1, SPI_CR1_SPE);
+    while (READ_BIT(spi_adc->SR, SPI_FLAG_RXNE) == true) {
+        [[maybe_unused]] uint16_t dummy = spi_adc->DR;
+    }
+
+    uint16_t tx_data;
+    if (is_write) {
+        tx_data = 0b0001010011111111;
+    } else {
+        tx_data = 0b11010100 << 8;
+        tx_data |= tx_reg;
+    }
+
+    set_CNVST(true);
+    delay_us(10);
+    set_CNVST(false);
+    delay_us(10);
+    while (READ_BIT(spi_adc->SR, SPI_FLAG_TXE) == false) {
+    }
+    spi_adc->DR = ~tx_data;
+    while (READ_BIT(spi_adc->SR, SPI_FLAG_RXNE) == false) {
+    }
+    uint16_t rx_data = ~(spi_adc->DR);
+    set_CNVST(true);
+    delay_us(10);
+
+    return rx_data & 0xFF;
 }
 
 extern "C" {

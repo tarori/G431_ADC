@@ -64,5 +64,7 @@ file(GLOB MAIN_SOURCE "Src/*.cpp" "Src/*.c")
 add_executable(${PROJECT_NAME}.elf ${MAIN_SOURCE} ${PERIPH_LIB_SOURCE} ${USB_LIB_SOURCE})
 add_custom_target(${PROJECT_NAME}.hex ALL
     COMMAND arm-none-eabi-objcopy --output-format=ihex ${PROJECT_NAME}.elf ${PROJECT_NAME}.hex DEPENDS ${PROJECT_NAME}.elf)
-#add_custom_target(write COMMAND /mnt/c/Program\ Files/STMicroelectronics/STM32Cube/STM32CubeProgrammer/bin/STM32_Programmer_CLI.exe -c port=SWD -d ./${PROJECT_NAME}.elf -s DEPENDS ${PROJECT_NAME}.hex)
-add_custom_target(write COMMAND ${CMAKE_SOURCE_DIR}/program.sh ${PROJECT_NAME}.hex DEPENDS ${PROJECT_NAME}.hex)
+add_custom_target(write COMMAND /mnt/c/Program\ Files/STMicroelectronics/STM32Cube/STM32CubeProgrammer/bin/STM32_Programmer_CLI.exe -c port=SWD -d ./${PROJECT_NAME}.elf -s DEPENDS ${PROJECT_NAME}.hex)
+#add_custom_target(write COMMAND ${CMAKE_SOURCE_DIR}/program.sh ${PROJECT_NAME}.hex DEPENDS ${PROJECT_NAME}.hex)
+
+add_custom_target(read COMMAND g++ -O2 -Wall -Wextra ${CMAKE_SOURCE_DIR}/main.cpp -o read_program)
