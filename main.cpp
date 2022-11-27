@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 
 // Serial port headers
 #include <fcntl.h>    // Contains file controls like O_RDWR
@@ -7,9 +8,9 @@
 #include <termios.h>  // Contains POSIX terminal control definitions
 #include <unistd.h>   // write(), read(), close()
 
-#define DEV_NAME "/dev/ttyS3"
-#define BAUD_RATE B2000000
-#define BUFF_SIZE 4096
+#define DEV_NAME "/dev/ttyS5"
+constexpr uint32_t baud_rate = 2000000;
+constexpr uint32_t buff_size = 4096;
 
 void serial_init(int fd)
 {
@@ -17,8 +18,8 @@ void serial_init(int fd)
     memset(&tio, 0, sizeof(tio));
     tio.c_cflag = CS8 | CLOCAL | CREAD;
     tio.c_cc[VTIME] = 100;
-    cfsetispeed(&tio, BAUD_RATE);
-    cfsetospeed(&tio, BAUD_RATE);
+    cfsetispeed(&tio, baud_rate);
+    cfsetospeed(&tio, baud_rate);
     tcsetattr(fd, TCSANOW, &tio);
 }
 
@@ -40,37 +41,43 @@ int main(int argc, char* argv[])
     serial_init(fd);
     printf("Port opened\n");
 
-    if (argc == 1) {
+    if (argc < 2) {
         printf("./run logname.txt\n");
         return 1;
     }
 
-    FILE* fp = fopen(argv[1], "w");
-    serial_write(fd, 's');
-    printf("Saving ");
-    while (1) {
-        char buf[BUFF_SIZE];
-        int size = read(fd, buf, sizeof(buf));
-        int i = 0;
-        for (i = 0; i < size; ++i) {
-            // printf("%c", buf[i]);
-            if (buf[i] == '\r') {
-                size = -1;
+    int data_num = argc - 1;
+
+    printf("Acquiring %d data\n", data_num);
+    for (int i = 0; i < data_num; ++i) {
+        FILE* fp = fopen(argv[i + 1], "w");
+        serial_write(fd, 's');
+        printf("Saving ");
+        while (1) {
+            char buf[buff_size];
+            int size = read(fd, buf, sizeof(buf));
+            int i = 0;
+            for (i = 0; i < size; ++i) {
+                // printf("%c", buf[i]);
+                if (buf[i] == '\r') {
+                    size = -1;
+                    break;
+                }
+                if (buf[i] == '\0') {
+                    printf("Hur?\n");
+                    continue;
+                }
+                fputc(buf[i], fp);
+            }
+            printf(".");
+            fflush(stdout);
+            if (size < 0) {
                 break;
             }
-            if (buf[i] == '\0') {
-                printf("Hur?\n");
-                continue;
-            }
-            fputc(buf[i], fp);
         }
-        printf(".");
-        fflush(stdout);
-        if (size < 0) {
-            break;
-        }
+        printf("\n%d Data end\n", i + 1);
+        fclose(fp);
+        sleep(1);
     }
-    printf("Data end\n");
-    fclose(fp);
     return 0;
 }

@@ -32,8 +32,9 @@ public:
         send_dummy_4byte();
         cs_high();
         delay_command();
+        __HAL_SPI_DISABLE(hspi);
         MODIFY_REG(hspi->Instance->CR1, SPI_CR1_BR, SPI_BAUDRATEPRESCALER_8);
-        MODIFY_REG(hspi->Instance->CR1, SPI_CR1_CPOL, SPI_POLARITY_HIGH);
+        __HAL_SPI_ENABLE(hspi);
         cs_low();
     }
 
@@ -54,8 +55,10 @@ public:
     {
         send_dummy_4byte();
         cs_high();
+
+        __HAL_SPI_DISABLE(hspi);
         MODIFY_REG(hspi->Instance->CR1, SPI_CR1_BR, SPI_BAUDRATEPRESCALER_32);
-        MODIFY_REG(hspi->Instance->CR1, SPI_CR1_CPOL, SPI_POLARITY_HIGH);
+        __HAL_SPI_ENABLE(hspi);
     }
 
     void end_read()

@@ -9,11 +9,13 @@
 constexpr bool print_stat = false;
 constexpr bool internal_memory = false;
 constexpr bool decim_en = false;
-constexpr uint32_t decim_ratio = 32;
+constexpr uint32_t decim_ratio = 16;
 
 constexpr uint32_t data_buf_internal_len = 4096;
 constexpr uint32_t data_buf_external_len = 4 * 65536;
 uint16_t data_buf_internal[data_buf_internal_len];
+
+constexpr uint32_t skip_length = 4;
 
 SRAM sram(&hspi3, SRAM_CS_GPIO_Port, SRAM_CS_Pin);
 
@@ -29,7 +31,7 @@ void main_loop()
     setbuf(stdout, NULL);
     setbuf(stdin, NULL);
     putc('\r', stdout);  // flush
-    huart1.Init.BaudRate = 2000000;
+    huart1.Init.BaudRate = 115200;
     HAL_UART_Init(&huart1);
     printf("Hello, I am working at %ld MHz\n", SystemCoreClock / 1000 / 1000);
 
@@ -44,21 +46,18 @@ void main_loop()
     printf("ADC reg: 0x%x\n", adc_spi_communicate(false, 0));
     printf("ADC is ready\n");
 
-    /*
-    while (1) {
-        adc_measure();
-    }
-    */
+
+    // while (1) {
+    //     adc_measure();
+    // }
 
     while (1) {
-        /*
         while (1) {
             uint8_t c = getc(stdin);
             if (c == 's') {
                 break;
             }
         }
-        */
 
         uint32_t start_clock = TIM2->CNT;
         {
@@ -78,7 +77,7 @@ void main_loop()
             HAL_GPIO_WritePin(LED_ERR_GPIO_Port, LED_ERR_Pin, GPIO_PIN_SET);
             if (!internal_memory) {
                 sram.start_read();
-                for (uint32_t i = 0; i < data_buf_external_len; ++i) {
+                for (uint32_t i = 0; i < data_buf_external_len + skip_length; ++i) {
                     if (!decim_en) {
                         while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_TXE)) {
                         }
@@ -88,7 +87,12 @@ void main_loop()
                         uint16_t value = hspi3.Instance->DR;
 
                         int16_t code = value;
-                        printf("%d\n", code);
+                        if (i >= skip_length) {
+                            // printf("%d\n", code);
+                            uint8_t usb_buf[16];
+                            uint32_t len = sprintf((char*)usb_buf, "%d\n", code);
+                            USB_Transmit_Data(usb_buf, len);
+                        }
                     } else {
                         while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_TXE)) {
                         }
@@ -104,10 +108,17 @@ void main_loop()
                         value |= hspi3.Instance->DR;
 
                         int32_t code = value;
-                        printf("%ld\n", code);
+                        if (i >= skip_length) {
+                            //printf("%ld\n", code);
+                            uint8_t usb_buf[16];
+                            uint32_t len = sprintf((char*)usb_buf, "%ld\n", code);
+                            USB_Transmit_Data(usb_buf, len);
+                        }
                     }
                 }
-                printf("\r");
+                // printf("\r");
+                uint8_t usb_buf = '\r';
+                USB_Transmit_Data(&usb_buf, 1);
                 sram.end_read();
             } else {
                 for (uint32_t i = 0; i < data_buf_internal_len; ++i) {
@@ -124,8 +135,6 @@ void main_loop()
             printf("%.2fus, %.3fMS/s, %.3fCLK\n", us_elapsed, sample_rate_mega, clock_per_sample);
         }
         delay_ms(100);
-
-        delay_ms(10000);
     }
 }
 
@@ -159,7 +168,7 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure()
     uint32_t decim_count = 0;
     int32_t sum = 0;
     uint32_t sending_sum = 0;
-    while (data_count < data_buf_external_len + 4) {
+    while (data_count < data_buf_external_len + skip_length) {
 
         // Converting phase
         set_CNVST(true);
@@ -193,7 +202,7 @@ __attribute__((long_call, section(".ccmram"))) void adc_measure()
             }
             ++decim_count;
         }
-        while (TIM1->CNT < 110) {
+        while (TIM1->CNT < 110) {  // 70 for 1.33MHz
         }
     }
 

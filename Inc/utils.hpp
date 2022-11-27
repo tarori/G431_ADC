@@ -6,6 +6,8 @@
 #define __ALIGN_MASK(x, mask) ((x) & ~(mask))
 #define ALIGN(x, a) __ALIGN_MASK(x, (typeof(x))(a)-1)
 
+void USB_Transmit_Data(uint8_t* ptr, int len);
+
 static inline void delay_us(uint32_t us)
 {
     uint32_t old_val = SysTick->VAL;
