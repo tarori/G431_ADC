@@ -8,7 +8,7 @@
 #include <termios.h>  // Contains POSIX terminal control definitions
 #include <unistd.h>   // write(), read(), close()
 
-#define DEV_NAME "/dev/ttyS5"
+#define DEV_NAME "/dev/ttyS4"
 constexpr uint32_t baud_rate = 2000000;
 constexpr uint32_t buff_size = 4096;
 

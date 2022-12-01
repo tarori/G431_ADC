@@ -3,13 +3,18 @@
 #include "usbd_cdc_if.h"
 #include "utils.hpp"
 
+uint8_t usb_send_buf[1024];
+
 void USB_Transmit_Data(uint8_t* ptr, int len)
 {
     uint8_t ret;
     uint32_t timeout = 10000;
     uint32_t tick_start = uwTick;
+
+    memcpy(usb_send_buf, ptr, len);
+
     do {
-        ret = CDC_Transmit_FS((uint8_t*)ptr, len);
+        ret = CDC_Transmit_FS(usb_send_buf, len);
     } while (ret != USBD_OK && uwTick - tick_start < timeout);
 
     if (uwTick - tick_start >= timeout) {
@@ -53,8 +58,9 @@ uint8_t* cdc_buffer;
 
 int _read(int file, char* ptr, int len)
 {
-    /*
     (void)file;
+
+    /*
     int DataIdx;
 
     for (DataIdx = 0; DataIdx < len; DataIdx++) {

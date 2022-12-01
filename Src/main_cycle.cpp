@@ -12,8 +12,12 @@ constexpr bool decim_en = false;
 constexpr uint32_t decim_ratio = 16;
 
 constexpr uint32_t data_buf_internal_len = 4096;
-constexpr uint32_t data_buf_external_len = 4 * 65536;
+constexpr uint32_t data_buf_external_len = 8 * 65536;
 uint16_t data_buf_internal[data_buf_internal_len];
+
+constexpr uint32_t send_buf_len = 1000;
+constexpr uint32_t send_buf_margine = 10;
+uint8_t send_buf[send_buf_len + send_buf_margine];
 
 constexpr uint32_t skip_length = 4;
 
@@ -77,6 +81,8 @@ void main_loop()
             HAL_GPIO_WritePin(LED_ERR_GPIO_Port, LED_ERR_Pin, GPIO_PIN_SET);
             if (!internal_memory) {
                 sram.start_read();
+                uint8_t* send_buf_ptr = send_buf;
+                uint32_t send_buf_data_num = 0;
                 for (uint32_t i = 0; i < data_buf_external_len + skip_length; ++i) {
                     if (!decim_en) {
                         while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_TXE)) {
@@ -89,9 +95,14 @@ void main_loop()
                         int16_t code = value;
                         if (i >= skip_length) {
                             // printf("%d\n", code);
-                            uint8_t usb_buf[16];
-                            uint32_t len = sprintf((char*)usb_buf, "%d\n", code);
-                            USB_Transmit_Data(usb_buf, len);
+                            uint32_t text_len = sprintf((char*)send_buf_ptr, "%d\n", code);
+                            send_buf_data_num += text_len;
+                            send_buf_ptr += text_len;
+                            if (send_buf_data_num > send_buf_len) {
+                                USB_Transmit_Data(send_buf, send_buf_data_num);
+                                send_buf_ptr = send_buf;
+                                send_buf_data_num = 0;
+                            }
                         }
                     } else {
                         while (!READ_BIT(hspi3.Instance->SR, SPI_FLAG_TXE)) {
@@ -110,15 +121,21 @@ void main_loop()
                         int32_t code = value;
                         if (i >= skip_length) {
                             //printf("%ld\n", code);
-                            uint8_t usb_buf[16];
-                            uint32_t len = sprintf((char*)usb_buf, "%ld\n", code);
-                            USB_Transmit_Data(usb_buf, len);
+                            uint32_t text_len = sprintf((char*)send_buf_ptr, "%ld\n", code);
+                            send_buf_data_num += text_len;
+                            send_buf_ptr += text_len;
+                            if (send_buf_data_num > send_buf_len) {
+                                USB_Transmit_Data(send_buf, send_buf_data_num);
+                                send_buf_ptr = send_buf;
+                                send_buf_data_num = 0;
+                            }
                         }
                     }
                 }
                 // printf("\r");
-                uint8_t usb_buf = '\r';
-                USB_Transmit_Data(&usb_buf, 1);
+                send_buf_ptr[0] = '\r';
+                send_buf_data_num++;
+                USB_Transmit_Data(send_buf, send_buf_data_num);
                 sram.end_read();
             } else {
                 for (uint32_t i = 0; i < data_buf_internal_len; ++i) {

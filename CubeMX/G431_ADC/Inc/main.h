@@ -67,6 +67,7 @@ void Error_Handler(void);
 #define CNVST_OUT_GPIO_Port GPIOB
 #define SRAM_CS_Pin GPIO_PIN_15
 #define SRAM_CS_GPIO_Port GPIOA
+
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
